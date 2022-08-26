@@ -22,8 +22,8 @@ contract NFTMarket is ReentrancyGuard {
         uint256 itmeId;
         address nftContract;
         uint256 tokenId;
-        address payable owner;
         address payable seller;
+        address payable owner;
         uint256 price;
         bool sold;
     }
@@ -71,10 +71,91 @@ contract NFTMarket is ReentrancyGuard {
             nftContract,
             tokenId,
             msg.sender,
-            address(this),
+            address(0),
             price,
             false
         );
+    }
 
+
+    function buyNFT(address nftContract, uint256 itemId) public payable nonReentrant {
+        uint256 price = idToMarketItem[itemId].price;
+        uint256 tokenId = idToMarketItem[itemId].tokenId;
+
+        require(msg.value == price, "NFTMarket: Asking price did not match.");
+
+        idToMarketItem[itemId].owner.transfer(msg.value);
+        
+        IERC721(nftContract).transferFrom(address(this), msg.sender, tokenId);
+
+        idToMarketItem[itemId].owner = payable(msg.sender);
+        idToMarketItem[itemId].sold = true;
+
+        _itemsSold.increment();
+
+        payable(address(owner)).transfer(listingPrice);
+    }
+
+    function fetchMarketItems() public view returns(MarketItem[] memory) {
+        uint totalItems = _itemIds.current();
+        uint soldItems = _itemsSold.current();
+        
+        uint unsoldItems = totalItems - soldItems;
+        MarketItem[] memory items = new MarketItem[](unsoldItems);
+        uint index;
+
+        for(uint i=0; i < totalItems; i++) {
+            if(idToMarketItem[i+1].owner == address(0)){
+                MarketItem storage currentItem = idToMarketItem[i+1];
+                items[index] = currentItem;
+                index += 1; 
+            }
+        }
+        return items;
+    }
+
+    function fetchMyNFTs() public view returns(MarketItem[] memory) {
+        uint totalItems = _itemIds.current();
+        uint itemCount = 0;
+        uint index;
+        
+        for(uint i=0; i < totalItems; i++){
+            itemCount += 1;
+        }
+        
+        MarketItem[] memory items = new MarketItem[](itemCount);
+      
+
+        for(uint i=0; i < totalItems; i++) {
+            if(idToMarketItem[i+1].owner == msg.sender){
+                MarketItem storage currentItem = idToMarketItem[i+1];
+                items[index] = currentItem;
+                index += 1; 
+            }
+        }
+        return items;
+    }
+
+    function fetchCreatedNFT() public view returns(MarketItem[] memory) {
+        uint totalItems = _itemIds.current();
+        uint itemCount = 0;
+        uint index;
+        
+        for(uint i=0; i < totalItems; i++){
+            itemCount += 1;
+        }
+        
+        MarketItem[] memory items = new MarketItem[](itemCount);
+      
+
+        for(uint i=0; i < totalItems; i++) {
+            if(idToMarketItem[i+1].seller == msg.sender){
+                MarketItem storage currentItem = idToMarketItem[i+1];
+                items[index] = currentItem;
+                index += 1; 
+            }
+        }
+        return items;
+    }
 
 }
